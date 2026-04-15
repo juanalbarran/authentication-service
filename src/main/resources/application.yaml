@@ -1,0 +1,43 @@
+# java/application.yaml
+spring:
+  application:
+    name: ${application_name}
+
+  datasource:
+    # Matches the 'app_db' and port 5432 defined in your devenv.nix
+    url: jdbc:postgresql://localhost:5432/${database_name}
+    # In devenv, the default user is usually your system username
+    username: ${database_username}
+    password: ${database_password}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      # The ddl-auto is on validate because we are gonna work with liguibase (update if not)
+      ddl-auto: validate
+      # ddl-auto: update/create
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        highlight_sql: true
+
+  liquibase:
+    enabled: true
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+
+  # If you use Spring Boot DevTools (highly recommended for Maven projects)
+  devtools:
+    restart:
+      enabled: true
+    livereload:
+      enabled: true
+
+# Useful for debugging your Spring Boot application in the console window
+logging:
+  level:
+    root: INFO
+    org.springframework.web: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE

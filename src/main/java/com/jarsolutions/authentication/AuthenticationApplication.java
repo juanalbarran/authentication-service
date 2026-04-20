@@ -1,13 +1,13 @@
-package com.jarsolutions.authentication_service;
+package com.jarsolutions.authentication;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class AuthenticationServiceApplication {
+public class AuthenticationApplication {
 
   public static void main(String[] args) {
     System.out.println("Hola Mundo");
-    SpringApplication.run(AuthenticationServiceApplication.class, args);
+    SpringApplication.run(AuthenticationApplication.class, args);
   }
 }

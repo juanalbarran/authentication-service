@@ -32,7 +32,11 @@ public class SecurityConfig {
         .sessionManagement(
             session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(
-            auth -> auth.requestMatchers("/login").permitAll().anyRequest().authenticated());
+            auth ->
+                auth.requestMatchers("/login", "/register")
+                    .permitAll()
+                    .anyRequest()
+                    .authenticated());
     return http.build();
   }
 }

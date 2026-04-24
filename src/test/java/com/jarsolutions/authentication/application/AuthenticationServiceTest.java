@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Mockito;
+import org.mockito.Mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -36,13 +36,13 @@ public class AuthenticationServiceTest {
     User savedUser = new User("juan.albarran", "hashedPassword");
     savedUser.setId(1L);
 
-    Mockito.when(userRepository.existsByUsername("juan.albarran")).thenReturn(false);
-    Mockito.when(passwordEncoder.encode("password")).thenReturn("hashedPassword");
-    Mockito.when(userRepository.save(Mockito.any(User.class))).thenReturn(savedUser);
-    Mockito.when(jwtService.generateAccessToken("juan.albarran")).thenReturn("mock-access-token");
-    Mockito.when(jwtService.generateRefreshToken("juan.albarran")).thenReturn("mock-refresh-token");
+    when(userRepository.existsByUsername("juan.albarran")).thenReturn(false);
+    when(passwordEncoder.encode("password")).thenReturn("hashedPassword");
+    when(userRepository.save(any(User.class))).thenReturn(savedUser);
+    when(jwtService.generateAccessToken("juan.albarran")).thenReturn("mock-access-token");
+    when(jwtService.generateRefreshToken("juan.albarran")).thenReturn("mock-refresh-token");
 
-    Mockito.when(jwtService.getRefreshTokenExpiration()).thenReturn(604800000L);
+    when(jwtService.getRefreshTokenExpiration()).thenReturn(604800000L);
 
     RegisterOutput output = authenticationService.register(input);
 
@@ -52,22 +52,22 @@ public class AuthenticationServiceTest {
     assertEquals("juan.albarran", output.userOutput().username());
     assertEquals(1L, output.userOutput().id());
 
-    Mockito.verify(userRepository, Mockito.times(1)).save(Mockito.any(User.class));
-    Mockito.verify(userSessionRepository, Mockito.times(1)).save(Mockito.any());
+    verify(userRepository, times(1)).save(any(User.class));
+    verify(userSessionRepository, times(1)).save(any());
   }
 
   @Test
   void register_WhenUserAlreadyExists_ShouldThrowException() {
     RegisterInput input = new RegisterInput("juan.albarran", "password", "macbook:juan");
 
-    Mockito.when(userRepository.existsByUsername("juan.albarran")).thenReturn(true);
+    when(userRepository.existsByUsername("juan.albarran")).thenReturn(true);
 
     UserAlreadyExistsException exception =
         assertThrows(UserAlreadyExistsException.class, () -> authenticationService.register(input));
 
     assertEquals("User juan.albarran already exists.", exception.getMessage());
 
-    Mockito.verify(userRepository, Mockito.never()).save(Mockito.any(User.class));
-    Mockito.verify(userSessionRepository, Mockito.never()).save(Mockito.any());
+    verify(userRepository, never()).save(any(User.class));
+    verify(userSessionRepository, never()).save(any());
   }
 }

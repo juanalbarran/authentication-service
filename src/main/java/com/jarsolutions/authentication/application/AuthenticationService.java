@@ -1,5 +1,6 @@
 package com.jarsolutions.authentication.application;
 
+import com.jarsolutions.authentication.application.input.LoginInput;
 import com.jarsolutions.authentication.application.input.RegisterInput;
 import com.jarsolutions.authentication.application.output.LoginOutput;
 import com.jarsolutions.authentication.application.output.RegisterOutput;
@@ -14,6 +15,7 @@ import jakarta.transaction.Transactional;
 import java.time.Instant;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -44,10 +46,25 @@ public class AuthenticationService {
     this.userSessionRepository = userSessionRepository;
   }
 
-  public LoginOutput login(String username, String password, String deviceType) {
-    authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(username, password));
+  public LoginOutput login(LoginInput loginInput) {
+    String username = loginInput.username();
+    authenticationManager.authenticate(
+        new UsernamePasswordAuthenticationToken(username, loginInput.password()));
 
-    return null;
+    User user =
+        userRepository
+            .findByUsername(username)
+            .orElseThrow(
+                () -> new UsernameNotFoundException("There is no user with that username."));
+
+    TokenOutput tokens = createTokens(username);
+
+    createUserSession(
+        new CreateUserSessionInput(tokens.refreshToken(), loginInput.deviceInfo(), user));
+
+    UserOutput userOutput = new UserOutput(user.getId(), username);
+
+    return new LoginOutput(tokens, userOutput);
   }
 
   public RegisterOutput register(RegisterInput registerInput) throws UserAlreadyExistsException {

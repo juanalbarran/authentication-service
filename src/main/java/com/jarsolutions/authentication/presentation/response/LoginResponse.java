@@ -1,3 +1,3 @@
 package com.jarsolutions.authentication.presentation.response;
 
-public record AuthResponse(Long id, String username) {}
+public record LoginResponse(Long id, String username) {}

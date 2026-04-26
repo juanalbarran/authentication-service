@@ -1,3 +1,3 @@
 package com.jarsolutions.authentication.application.output;
 
-public record LoginOutput(String accessToken, String refreshToken, UserOutput userOutput) {}
+public record LoginOutput(TokenOutput tokenOutput, UserOutput userOutput) {}

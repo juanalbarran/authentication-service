@@ -1,3 +1,14 @@
 package com.jarsolutions.authentication.application.input;
 
-public record LoginInput(String username, String password, String deviceInfo) {}
+import static com.jarsolutions.authentication.application.util.ValidationUtil.minimumSize;
+import static com.jarsolutions.authentication.application.util.ValidationUtil.requireNonBlank;
+
+public record LoginInput(String username, String password, String deviceInfo) {
+  public LoginInput {
+    requireNonBlank(username, "Username");
+    requireNonBlank(password, "Password");
+    requireNonBlank(deviceInfo, "Device Info");
+    minimumSize(username, 8, "Username");
+    minimumSize(password, 8, "Password");
+  }
+}

@@ -6,18 +6,24 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import com.jarsolutions.authentication.application.input.LoginInput;
 import com.jarsolutions.authentication.application.input.RegisterInput;
+import com.jarsolutions.authentication.application.output.LoginOutput;
 import com.jarsolutions.authentication.application.output.RegisterOutput;
 import com.jarsolutions.authentication.domain.entity.User;
+import com.jarsolutions.authentication.domain.entity.UserSession;
 import com.jarsolutions.authentication.domain.exception.UserAlreadyExistsException;
 import com.jarsolutions.authentication.domain.repository.UserRepository;
 import com.jarsolutions.authentication.domain.repository.UserSessionRepository;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 @ExtendWith(MockitoExtension.class)
@@ -69,6 +75,46 @@ public class AuthenticationServiceTest {
     assertEquals("User juan.albarran already exists.", exception.getMessage());
 
     verify(userRepository, never()).save(any(User.class));
+    verify(userSessionRepository, never()).save(any());
+  }
+
+  @Test
+  void login_WhenCredentialsAreValid_ShouldSuccessfullyLogin() {
+    LoginInput input = new LoginInput("juan.albarran", "superSecretPassword", "macbook:office");
+    User existingUser = new User("juan.albarran", "hashedPassword");
+    existingUser.setId(1L);
+
+    when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
+        .thenReturn(
+            new UsernamePasswordAuthenticationToken("juan.albarran", "superSecretPassword"));
+    when(userRepository.findByUsername("juan.albarran")).thenReturn(Optional.of(existingUser));
+    when(jwtService.generateAccessToken("juan.albarran")).thenReturn("mock-access-token");
+    when(jwtService.generateRefreshToken("juan.albarran")).thenReturn("mock-refresh-token");
+    when(jwtService.getRefreshTokenExpiration()).thenReturn(604800000L);
+
+    LoginOutput output = authenticationService.login(input);
+
+    assertNotNull(output);
+    assertEquals("mock-access-token", output.tokenOutput().accessToken());
+    assertEquals("mock-refresh-token", output.tokenOutput().refreshToken());
+    assertEquals("juan.albarran", output.userOutput().username());
+    assertEquals(1L, output.userOutput().id());
+
+    verify(userSessionRepository, times(1)).save(any(UserSession.class));
+  }
+
+  @Test
+  void login_WhenUserNotFoundInDatabase_ShouldThrowException() {
+    LoginInput input = new LoginInput("juan.albarran", "superSecretPassword", "macbook:office");
+
+    when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
+        .thenReturn(new UsernamePasswordAuthenticationToken("juan.albarran", "password"));
+    when(userRepository.findByUsername("juan.albarran")).thenReturn(Optional.empty());
+    UsernameNotFoundException exception =
+        assertThrows(UsernameNotFoundException.class, () -> authenticationService.login(input));
+    assertEquals("There is no user with that username.", exception.getMessage());
+
+    verify(jwtService, never()).generateAccessToken(anyString());
     verify(userSessionRepository, never()).save(any());
   }
 }

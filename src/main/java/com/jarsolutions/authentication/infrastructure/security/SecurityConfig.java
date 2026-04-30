@@ -33,7 +33,7 @@ public class SecurityConfig {
             session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(
             auth ->
-                auth.requestMatchers("/login", "/register")
+                auth.requestMatchers("/login", "/register", "/refresh", "/logout")
                     .permitAll()
                     .anyRequest()
                     .authenticated());

@@ -3,20 +3,25 @@ package com.jarsolutions.authentication.presentation;
 import com.jarsolutions.authentication.application.AuthenticationService;
 import com.jarsolutions.authentication.application.JwtService;
 import com.jarsolutions.authentication.application.input.LoginInput;
+import com.jarsolutions.authentication.application.input.RefreshInput;
 import com.jarsolutions.authentication.application.input.RegisterInput;
 import com.jarsolutions.authentication.application.output.LoginOutput;
 import com.jarsolutions.authentication.application.output.RegisterOutput;
+import com.jarsolutions.authentication.application.output.TokenOutput;
 import com.jarsolutions.authentication.presentation.mapper.AuthenticationMapper;
 import com.jarsolutions.authentication.presentation.request.LoginRequest;
 import com.jarsolutions.authentication.presentation.request.RegisterRequest;
 import com.jarsolutions.authentication.presentation.response.LoginResponse;
 import com.jarsolutions.authentication.presentation.response.RegisterResponse;
 import jakarta.validation.Valid;
+import java.util.Map;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -66,5 +71,25 @@ public class AuthenticationController {
     return ResponseEntity.ok()
         .header(HttpHeaders.SET_COOKIE, responseCookie.toString())
         .body(registerResponse);
+  }
+
+  @PostMapping("/refresh")
+  public ResponseEntity<Map<String, String>> refresh(
+      @CookieValue(name = "refresh_token") String refreshToken,
+      @RequestHeader(value = "User-Agent", defaultValue = "unknown") String deviceInfo) {
+    RefreshInput input = new RefreshInput(refreshToken, deviceInfo);
+    TokenOutput tokens = authenticationService.refresh(input);
+
+    long cookieExpirationInSeconds = jwtService.getRefreshTokenExpiration() / 1000;
+    ResponseCookie cookie =
+        ResponseCookie.from("refresh_token", tokens.refreshToken())
+            .httpOnly(true)
+            .secure(true)
+            .path("/")
+            .maxAge(cookieExpirationInSeconds)
+            .build();
+    return ResponseEntity.ok()
+        .header(HttpHeaders.SET_COOKIE, cookie.toString())
+        .body(Map.of("accessToken", tokens.accessToken()));
   }
 }

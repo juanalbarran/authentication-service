@@ -1,6 +1,7 @@
 package com.jarsolutions.authentication.application;
 
 import com.jarsolutions.authentication.application.input.LoginInput;
+import com.jarsolutions.authentication.application.input.LogoutInput;
 import com.jarsolutions.authentication.application.input.RefreshInput;
 import com.jarsolutions.authentication.application.input.RegisterInput;
 import com.jarsolutions.authentication.application.output.LoginOutput;
@@ -72,6 +73,7 @@ public class AuthenticationService {
 
     String username = registerInput.username();
     String password = registerInput.password();
+    String deviceInfo = registerInput.deviceInfo();
 
     if (userRepository.existsByUsername(username)) {
       throw new UserAlreadyExistsException("User " + username + " already exists.");
@@ -80,8 +82,7 @@ public class AuthenticationService {
     User user = createUser(new CreateUserInput(username, password));
     TokenOutput tokens = createTokens(username);
 
-    createUserSession(
-        new CreateUserSessionInput(tokens.refreshToken(), registerInput.deviceInfo(), user));
+    createUserSession(new CreateUserSessionInput(tokens.refreshToken(), deviceInfo, user));
     UserOutput userOutput = new UserOutput(user.getId(), username);
 
     return new RegisterOutput(tokens, userOutput);
@@ -110,6 +111,17 @@ public class AuthenticationService {
     createUserSession(
         new CreateUserSessionInput(newTokens.refreshToken(), refreshInput.deviceInfo(), user));
     return newTokens;
+  }
+
+  public void logout(LogoutInput logoutInput) {
+    UserSession userSession =
+        userSessionRepository
+            .findByToken(logoutInput.refreshToken())
+            .orElseThrow(
+                () ->
+                    new IllegalArgumentException(
+                        "Refresh token does not exists. There is no session open"));
+    userSessionRepository.delete(userSession);
   }
 
   private User createUser(CreateUserInput createUserInput) {

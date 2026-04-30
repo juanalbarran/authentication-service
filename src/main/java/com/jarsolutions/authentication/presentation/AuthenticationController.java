@@ -3,6 +3,7 @@ package com.jarsolutions.authentication.presentation;
 import com.jarsolutions.authentication.application.AuthenticationService;
 import com.jarsolutions.authentication.application.JwtService;
 import com.jarsolutions.authentication.application.input.LoginInput;
+import com.jarsolutions.authentication.application.input.LogoutInput;
 import com.jarsolutions.authentication.application.input.RefreshInput;
 import com.jarsolutions.authentication.application.input.RegisterInput;
 import com.jarsolutions.authentication.application.output.LoginOutput;
@@ -91,5 +92,21 @@ public class AuthenticationController {
     return ResponseEntity.ok()
         .header(HttpHeaders.SET_COOKIE, cookie.toString())
         .body(Map.of("accessToken", tokens.accessToken()));
+  }
+
+  @PostMapping("/logout")
+  public ResponseEntity<Void> logout(
+      @CookieValue(name = "refresh_token") String refreshToken,
+      @RequestHeader(value = "User-Agent", defaultValue = "unknown") String deviceInfo) {
+    LogoutInput logoutInput = new LogoutInput(refreshToken, deviceInfo);
+    authenticationService.logout(logoutInput);
+    ResponseCookie blankCookie =
+        ResponseCookie.from("refresh_token", "")
+            .httpOnly(true)
+            .secure(true)
+            .path("/")
+            .maxAge(0)
+            .build();
+    return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, blankCookie.toString()).build();
   }
 }

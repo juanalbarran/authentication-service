@@ -1,6 +1,8 @@
 package com.jarsolutions.authentication.presentation;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -9,12 +11,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jarsolutions.authentication.application.AuthenticationService;
 import com.jarsolutions.authentication.application.JwtService;
 import com.jarsolutions.authentication.application.input.LoginInput;
+import com.jarsolutions.authentication.application.input.LogoutInput;
 import com.jarsolutions.authentication.application.input.RefreshInput;
 import com.jarsolutions.authentication.application.input.RegisterInput;
 import com.jarsolutions.authentication.application.output.LoginOutput;
 import com.jarsolutions.authentication.application.output.RegisterOutput;
 import com.jarsolutions.authentication.application.output.TokenOutput;
 import com.jarsolutions.authentication.application.output.UserOutput;
+import com.jarsolutions.authentication.domain.exception.UserAlreadyExistsException;
 import com.jarsolutions.authentication.presentation.request.LoginRequest;
 import com.jarsolutions.authentication.presentation.request.RegisterRequest;
 import jakarta.servlet.http.Cookie;
@@ -25,6 +29,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -103,6 +108,23 @@ public class AuthenticationControllerTest {
   }
 
   @Test
+  void login_WhenUserNotFound_SHouldReturn401ErrorResponse() throws Exception {
+    LoginRequest request = new LoginRequest("fake.user", "superSecretPassword", "macbook");
+    when(authenticationService.login(any(LoginInput.class)))
+        .thenThrow(new UsernameNotFoundException("There is no user with that username"));
+    mockMvc
+        .perform(
+            post("/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.status").value(401))
+        .andExpect(jsonPath("$.error").value("Unauthorized"))
+        .andExpect(jsonPath("$.message").value("Invalid username or password"))
+        .andExpect(jsonPath("$.timestamp").exists());
+  }
+
+  @Test
   void register_WhenRequestIsInvalid_ShouldReturn400() throws Exception {
     RegisterRequest request = new RegisterRequest("", "superSecretPassword", "macbook:office");
 
@@ -139,5 +161,47 @@ public class AuthenticationControllerTest {
   @Test
   void refresh_WhenCookieIsMissing_ShouldReturn400() throws Exception {
     mockMvc.perform(post("/refresh")).andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void register_WhenUserAlreadyExists_ShouldReturn409ErrorResponse() throws Exception {
+    RegisterRequest request =
+        new RegisterRequest("juan.albarran", "superSecretPassword", "macbook");
+
+    when(authenticationService.register(any(RegisterInput.class)))
+        .thenThrow(new UserAlreadyExistsException("User juan.albarran already exists."));
+
+    mockMvc
+        .perform(
+            post("/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.status").value(409))
+        .andExpect(jsonPath("$.error").value("Conflict"))
+        .andExpect(jsonPath("$.message").value("User juan.albarran already exists."))
+        .andExpect(jsonPath("$.timestamp").exists());
+  }
+
+  @Test
+  void logout_WhenValidCookie_ShoudReturn200AndClearCookie() throws Exception {
+    String activeToken = "valid-refresh-token";
+
+    mockMvc
+        .perform(post("/logout").cookie(new Cookie("refresh_token", activeToken)))
+        .andExpect(status().isOk())
+        .andExpect(header().exists(HttpHeaders.SET_COOKIE))
+        .andExpect(
+            header().string(HttpHeaders.SET_COOKIE, Matchers.containsString("refresh_token=;")))
+        .andExpect(header().string(HttpHeaders.SET_COOKIE, Matchers.containsString("Max-Age=0")))
+        .andExpect(header().string(HttpHeaders.SET_COOKIE, Matchers.containsString("HttpOnly")))
+        .andExpect(header().string(HttpHeaders.SET_COOKIE, Matchers.containsString("Secure")));
+    verify(authenticationService, times(1)).logout(any(LogoutInput.class));
+  }
+
+  @Test
+  void logout_WhenValidCookieIsMissing_ShouldReturn400() throws Exception {
+    mockMvc.perform(post("/logout")).andExpect(status().isBadRequest());
+    verify(authenticationService, never()).logout(any());
   }
 }

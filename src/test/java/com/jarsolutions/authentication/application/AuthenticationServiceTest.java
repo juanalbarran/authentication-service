@@ -7,14 +7,17 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 import com.jarsolutions.authentication.application.input.LoginInput;
+import com.jarsolutions.authentication.application.input.RefreshInput;
 import com.jarsolutions.authentication.application.input.RegisterInput;
 import com.jarsolutions.authentication.application.output.LoginOutput;
 import com.jarsolutions.authentication.application.output.RegisterOutput;
+import com.jarsolutions.authentication.application.output.TokenOutput;
 import com.jarsolutions.authentication.domain.entity.User;
 import com.jarsolutions.authentication.domain.entity.UserSession;
 import com.jarsolutions.authentication.domain.exception.UserAlreadyExistsException;
 import com.jarsolutions.authentication.domain.repository.UserRepository;
 import com.jarsolutions.authentication.domain.repository.UserSessionRepository;
+import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -116,5 +119,66 @@ public class AuthenticationServiceTest {
 
     verify(jwtService, never()).generateAccessToken(anyString());
     verify(userSessionRepository, never()).save(any());
+  }
+
+  @Test
+  void refresh_WhenTokenIsValidAndUnexpired_ShouldReturnNewTokensAndRotateSession() {
+    RefreshInput input = new RefreshInput("valid-old-token", "macbook:office");
+    User existingUser = new User("juan.albarran", "hashedPassword");
+
+    UserSession activeSession =
+        new UserSession(
+            "valid-old-token", "macbook", Instant.now().plusSeconds(3600), existingUser);
+
+    when(userSessionRepository.findByToken("valid-old-token"))
+        .thenReturn(Optional.of(activeSession));
+    when(jwtService.generateAccessToken("juan.albarran")).thenReturn("new-acess-token");
+    when(jwtService.generateRefreshToken("juan.albarran")).thenReturn("new-refresh-token");
+    when(jwtService.getRefreshTokenExpiration()).thenReturn(604800000L);
+
+    TokenOutput output = authenticationService.refresh(input);
+
+    assertNotNull(output);
+    assertEquals("new-acess-token", output.accessToken());
+    assertEquals("new-refresh-token", output.refreshToken());
+
+    verify(userSessionRepository, times(1)).delete(activeSession);
+    verify(userSessionRepository, times(1)).save(any(UserSession.class));
+  }
+
+  @Test
+  void refresh_WhenTokenIsExpired_ShouldDeleteSessionAndThrowException() {
+    RefreshInput input = new RefreshInput("expired-token", "macbook");
+    User existingUser = new User("juan.albarran", "superSecretPassword");
+
+    UserSession expiredSession =
+        new UserSession("expired-token", "macbook", Instant.now().minusSeconds(3600), existingUser);
+
+    when(userSessionRepository.findByToken("expired-token"))
+        .thenReturn(Optional.of(expiredSession));
+
+    IllegalArgumentException exception =
+        assertThrows(IllegalArgumentException.class, () -> authenticationService.refresh(input));
+
+    assertEquals("Refresh token has expired. Please log in again.", exception.getMessage());
+
+    verify(userSessionRepository, times(1)).delete(expiredSession);
+    verify(jwtService, never()).generateAccessToken(anyString());
+    verify(userSessionRepository, never()).save(any(UserSession.class));
+  }
+
+  @Test
+  void refresh_WhenTokenIsNotFoundInDatabase_ShouldThrowException() {
+    RefreshInput input = new RefreshInput("fake-token", "macbook");
+
+    when(userSessionRepository.findByToken("fake-token")).thenReturn(Optional.empty());
+
+    IllegalArgumentException exception =
+        assertThrows(IllegalArgumentException.class, () -> authenticationService.refresh(input));
+
+    assertEquals("Invalid refresh token", exception.getMessage());
+
+    verify(userSessionRepository, never()).delete(any());
+    verify(jwtService, never()).generateAccessToken(anyString());
   }
 }

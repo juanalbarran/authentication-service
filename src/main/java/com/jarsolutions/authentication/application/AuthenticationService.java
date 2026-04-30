@@ -1,6 +1,7 @@
 package com.jarsolutions.authentication.application;
 
 import com.jarsolutions.authentication.application.input.LoginInput;
+import com.jarsolutions.authentication.application.input.RefreshInput;
 import com.jarsolutions.authentication.application.input.RegisterInput;
 import com.jarsolutions.authentication.application.output.LoginOutput;
 import com.jarsolutions.authentication.application.output.RegisterOutput;
@@ -84,6 +85,31 @@ public class AuthenticationService {
     UserOutput userOutput = new UserOutput(user.getId(), username);
 
     return new RegisterOutput(tokens, userOutput);
+  }
+
+  public TokenOutput refresh(RefreshInput refreshInput) {
+    String oldToken = refreshInput.refreshToken();
+
+    UserSession session =
+        userSessionRepository
+            .findByToken(oldToken)
+            .orElseThrow(() -> new IllegalArgumentException("Invalid refresh token"));
+
+    if (session.getExpiryDate().isBefore(Instant.now())) {
+      userSessionRepository.delete(session);
+      throw new IllegalArgumentException("Refresh token has expired. Please log in again.");
+    }
+
+    User user = session.getUser();
+    String username = user.getUsername();
+
+    TokenOutput newTokens = createTokens(username);
+
+    userSessionRepository.delete(session);
+
+    createUserSession(
+        new CreateUserSessionInput(newTokens.refreshToken(), refreshInput.deviceInfo(), user));
+    return newTokens;
   }
 
   private User createUser(CreateUserInput createUserInput) {

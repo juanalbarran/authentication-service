@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 import com.jarsolutions.authentication.application.input.LoginInput;
+import com.jarsolutions.authentication.application.input.LogoutInput;
 import com.jarsolutions.authentication.application.input.RefreshInput;
 import com.jarsolutions.authentication.application.input.RegisterInput;
 import com.jarsolutions.authentication.application.output.LoginOutput;
@@ -180,5 +181,31 @@ public class AuthenticationServiceTest {
 
     verify(userSessionRepository, never()).delete(any());
     verify(jwtService, never()).generateAccessToken(anyString());
+  }
+
+  @Test
+  void logout_WhenTokenIsNotFoundInDatabase_ShouldThrowException() {
+    LogoutInput input = new LogoutInput("fake-token", "macbook");
+
+    when(userSessionRepository.findByToken("fake-token")).thenReturn(Optional.empty());
+
+    IllegalArgumentException exception =
+        assertThrows(IllegalArgumentException.class, () -> authenticationService.logout(input));
+
+    assertEquals("Refresh token does not exists. There is no session open", exception.getMessage());
+  }
+
+  @Test
+  void logout_WhenTokenIsFoundOnDatabase_ShouldTriggerDeleteMethod() {
+    LogoutInput input = new LogoutInput("fake-token", "macbook");
+    User user = new User();
+    UserSession userSession =
+        new UserSession("fake-token", "macbook", Instant.now().plusSeconds(3600), user);
+
+    when(userSessionRepository.findByToken(input.refreshToken()))
+        .thenReturn(Optional.of(userSession));
+    authenticationService.logout(input);
+
+    verify(userSessionRepository, times(1)).delete(userSession);
   }
 }

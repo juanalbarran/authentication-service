@@ -2,7 +2,7 @@
 spring:
   application:
     name: ${application_name}
-
+  
   datasource:
     # Matches the 'app_db' and port 5432 defined in your devenv.nix
     url: jdbc:postgresql://localhost:5432/${database_name}
@@ -33,6 +33,12 @@ spring:
       enabled: true
     livereload:
       enabled: true
+
+app:
+  security:
+    cors:
+      allowed-origins: ${allowed-origins:http://localhost:3000}
+
 
 # Useful for debugging your Spring Boot application in the console window
 logging:

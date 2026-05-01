@@ -6,6 +6,7 @@
   database_password = "jarsolutions";
   database_host = "127.0.0.1";
   database_port = 5432;
+  allowed-origins = "http://localhost:3000";
 in {
   # https://devenv.sh/basics/
   env.GREET = "Java & Spring Boot Development";
@@ -15,6 +16,8 @@ in {
   env.database_password = database_password;
   env.database_host = database_host;
   env.database_port = database_port;
+
+  env.allowed-origins = allowed-origins;
 
   packages = with pkgs; [
     maven

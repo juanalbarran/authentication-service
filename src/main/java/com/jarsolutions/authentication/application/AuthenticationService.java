@@ -15,6 +15,8 @@ import com.jarsolutions.authentication.domain.repository.UserRepository;
 import com.jarsolutions.authentication.domain.repository.UserSessionRepository;
 import jakarta.transaction.Transactional;
 import java.time.Instant;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -24,6 +26,7 @@ import org.springframework.stereotype.Service;
 @Service
 @Transactional
 public class AuthenticationService {
+  private static final Logger log = LoggerFactory.getLogger(AuthenticationService.class);
 
   private final UserRepository userRepository;
   private final UserSessionRepository userSessionRepository;
@@ -50,6 +53,8 @@ public class AuthenticationService {
 
   public LoginOutput login(LoginInput loginInput) {
     String username = loginInput.username();
+    String deviceInfo = loginInput.deviceInfo();
+
     authenticationManager.authenticate(
         new UsernamePasswordAuthenticationToken(username, loginInput.password()));
 
@@ -60,12 +65,10 @@ public class AuthenticationService {
                 () -> new UsernameNotFoundException("There is no user with that username."));
 
     TokenOutput tokens = createTokens(username);
-
-    createUserSession(
-        new CreateUserSessionInput(tokens.refreshToken(), loginInput.deviceInfo(), user));
-
+    createUserSession(new CreateUserSessionInput(tokens.refreshToken(), deviceInfo, user));
     UserOutput userOutput = new UserOutput(user.getId(), username);
 
+    log.info("User '{}' successfully logged in from device: {}", username, deviceInfo);
     return new LoginOutput(tokens, userOutput);
   }
 
@@ -85,11 +88,13 @@ public class AuthenticationService {
     createUserSession(new CreateUserSessionInput(tokens.refreshToken(), deviceInfo, user));
     UserOutput userOutput = new UserOutput(user.getId(), username);
 
+    log.info("New user registered with username: '{}' from device: {}", username, deviceInfo);
     return new RegisterOutput(tokens, userOutput);
   }
 
   public TokenOutput refresh(RefreshInput refreshInput) {
     String oldToken = refreshInput.refreshToken();
+    String deviceInfo = refreshInput.deviceInfo();
 
     UserSession session =
         userSessionRepository
@@ -108,8 +113,9 @@ public class AuthenticationService {
 
     userSessionRepository.delete(session);
 
-    createUserSession(
-        new CreateUserSessionInput(newTokens.refreshToken(), refreshInput.deviceInfo(), user));
+    createUserSession(new CreateUserSessionInput(newTokens.refreshToken(), deviceInfo, user));
+
+    log.info("Tokens successfully refreshed for user '{}' from device: {}", username, deviceInfo);
     return newTokens;
   }
 
@@ -122,6 +128,8 @@ public class AuthenticationService {
                     new IllegalArgumentException(
                         "Refresh token does not exists. There is no session open"));
     userSessionRepository.delete(userSession);
+    log.info(
+        "User session manually terminated (logout) from device: {}", userSession.getDeviceInfo());
   }
 
   private User createUser(CreateUserInput createUserInput) {

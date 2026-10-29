@@ -4,8 +4,8 @@ spring:
     name: ${application_name}
   
   datasource:
-    # Matches the 'app_db' and port 5432 defined in your devenv.nix
-    url: jdbc:postgresql://localhost:5432/${database_name}
+    # Host and port come from devenv.nix
+    url: jdbc:postgresql://${database_host}:${database_port}/${database_name}
     # In devenv, the default user is usually your system username
     username: ${database_username}
     password: ${database_password}
